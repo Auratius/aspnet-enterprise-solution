@@ -1,0 +1,112 @@
+Here is a full example of a `docker-compose.yml` file based on your architecture for the **ASP.NET Enterprise Solution**:
+
+```yaml
+version: '3.9'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./website:/usr/share/nginx/html:ro
+    depends_on:
+      - webapi
+    networks:
+      - backend
+
+  webapi:
+    build:
+      context: ./webapi
+      dockerfile: Dockerfile
+    container_name: aspnet_webapi
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=AppDb;User=sa;Password=${SA_PASSWORD}
+    depends_on:
+      - sqlserver
+      - redis
+      - rabbitmq
+    networks:
+      - backend
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${SA_PASSWORD}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - backend
+
+  redis:
+    image: redis:alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - backend
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+    networks:
+      - backend
+
+volumes:
+  sqlserver_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  backend:
+    driver: bridge
+```
+
+---
+
+### 📝 Notes:
+
+* Make sure you define your `.env` file with `SA_PASSWORD=YourStrongPassword123!`.
+* Confirm that your ASP.NET Core app exposes metrics at `/metrics` for Prometheus.
+* The `nginx.conf` must route API requests to `webapi` (e.g., `/api` → `http://aspnet_webapi:80`).
+* If you’re using `docker compose` v2 syntax (CLI plugin), this file is fully compatible.
+
+Would you like me to generate a sample `.env`, `Dockerfile`, or `nginx.conf` as well?
